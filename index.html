@@ -124,13 +124,15 @@ select.sel.on { border-color: var(--brand); color: var(--brand-ink); }
 .ck-go { margin-top: auto; display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 700; color: var(--ink); }
 .ck-go svg { transition: transform var(--dur-1) var(--ease); }
 .check:hover .ck-go svg { transform: translateX(2px); }
-.gauge { position: relative; height: 6px; border-radius: 3px; background: var(--surface-3); margin-top: 4px; }
+.gauges { display: flex; flex-direction: column; gap: var(--sp-3); margin: 2px 0 var(--sp-1); }
+.gcap { display: flex; justify-content: space-between; align-items: baseline; gap: var(--sp-2); margin-bottom: 6px; font-size: 12.5px; color: var(--muted); }
+.gcap b { margin-left: 6px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.gcap .th { color: var(--body); white-space: nowrap; }
+.gauge { position: relative; height: 6px; border-radius: 3px; background: var(--surface-3); }
 .gauge i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; background: var(--series-past); transition: width .3s var(--ease); }
 .gauge.ng i { background: var(--danger); }
 .gauge s { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--ink); }
-.gcap { position: relative; height: 16px; font-size: 11.5px; color: var(--muted); }
-.gcap span { position: absolute; top: 2px; white-space: nowrap; }
-.gcap .th { transform: translateX(-50%); color: var(--body); font-weight: 700; }
+.check:focus-visible, .cell:focus-visible { outline-offset: -2px; }
 
 /* 차트 */
 .legend { display: flex; flex-wrap: wrap; gap: var(--sp-3); font-size: var(--fs-caption); color: var(--body); }
@@ -420,7 +422,7 @@ function evaluate(d, kpi, m) {
   const wr = tot ? wk / tot : 0;
   out.push({
     id: "weekend", name: "주말 계상 전표", ng: wr > THRESHOLDS.weekendShare, metric: pct(wr),
-    gauges: [{ v: wr, th: THRESHOLDS.weekendShare, max: Math.max(THRESHOLDS.weekendShare * 2, wr * 1.15), lo: "주말 비중", hi: `기준 ${pct(THRESHOLDS.weekendShare, 0)}` }],
+    gauges: [{ v: wr, th: THRESHOLDS.weekendShare, max: Math.max(THRESHOLDS.weekendShare * 2, wr * 1.15), lo: "주말 비중", fmt: x => pct(x), hi: `기준 ${pct(THRESHOLDS.weekendShare, 0)}` }],
     rule: `주말 전표 비중이 ${pct(THRESHOLDS.weekendShare, 0)}를 넘으면 주의`,
     target: `${periodLabel(d, m)} 전체 전표 ${won(tot)}건 중 주말 ${won(wk)}건`,
   });
@@ -439,7 +441,7 @@ function evaluate(d, kpi, m) {
   }
   out.push({
     id: "spike", name: `월별 급증 (${KPI[kpi].label})`, ng, metric, spikes, med, target,
-    gauges: [{ v: gv, th: THRESHOLDS.spikeVsMedian, max: Math.max(THRESHOLDS.spikeVsMedian * 2, gv * 1.15), lo: m ? `${m}월 ÷ 평월` : "최대 월 ÷ 평월", hi: `기준 ${THRESHOLDS.spikeVsMedian}배` }],
+    gauges: [{ v: gv, th: THRESHOLDS.spikeVsMedian, max: Math.max(THRESHOLDS.spikeVsMedian * 2, gv * 1.15), lo: m ? `${m}월 ÷ 평월` : "최대 월 ÷ 평월", fmt: x => `${x.toFixed(2)}배`, hi: `기준 ${THRESHOLDS.spikeVsMedian}배` }],
     rule: `월 금액이 평월(중앙값)의 ${THRESHOLDS.spikeVsMedian}배를 넘으면 주의`,
   });
   const c = d.concentration[String(m)];
@@ -449,8 +451,8 @@ function evaluate(d, kpi, m) {
     id: "conc", name: "매출 거래처 집중", ng: s1 > THRESHOLDS.top1Share || s10 > THRESHOLDS.top10Share,
     metric: `${pct(s1)} / ${pct(s10)}`,
     gauges: [
-      { v: s1, th: THRESHOLDS.top1Share, max: 1, lo: "1위", hi: `기준 ${pct(THRESHOLDS.top1Share, 0)}` },
-      { v: s10, th: THRESHOLDS.top10Share, max: 1, lo: "상위 10개사", hi: `기준 ${pct(THRESHOLDS.top10Share, 0)}` },
+      { v: s1, th: THRESHOLDS.top1Share, max: 1, lo: "1위 비중", fmt: x => pct(x), hi: `기준 ${pct(THRESHOLDS.top1Share, 0)}` },
+      { v: s10, th: THRESHOLDS.top10Share, max: 1, lo: "상위 10개사 비중", fmt: x => pct(x), hi: `기준 ${pct(THRESHOLDS.top10Share, 0)}` },
     ],
     rule: `1위 ${pct(THRESHOLDS.top1Share, 0)} 또는 상위 10개사 ${pct(THRESHOLDS.top10Share, 0)}를 넘으면 주의`,
     target: `${periodLabel(d, m)} 매출 거래처 ${won(c.top.length + c.etc.count)}개사 기준`,
@@ -512,8 +514,9 @@ function renderChecks(d, checks) {
     <button type="button" class="check" data-k="chk-${c.id}" data-check="${c.id}" aria-haspopup="dialog">
       <div class="ck-head"><span class="ck-name">${esc(c.name)}</span><span class="st ${c.ng ? "ng" : "ok"}">${c.ng ? ICON.ng : ICON.ok}${c.ng ? "주의" : "정상"}</span></div>
       <div class="ck-metric">${esc(c.metric)}</div>
-      <div aria-hidden="true">${c.gauges.map((g, j) => `<div class="gauge ${g.v > g.th ? "ng" : ""}"><i data-w="${Math.min(100, g.v / g.max * 100)}" data-nk="g-${c.id}-${j}"></i><s style="left:${g.th / g.max * 100}%"></s></div>
-        <div class="gcap"><span style="left:0">${g.lo}</span><span class="th" style="left:${g.th / g.max * 100}%">${g.hi}</span></div>`).join("")}</div>
+      <div class="gauges" aria-hidden="true">${c.gauges.map((g, j) => `<div>
+        <div class="gcap"><span>${g.lo}<b>${g.fmt(g.v)}</b></span><span class="th">${g.hi}</span></div>
+        <div class="gauge ${g.v > g.th ? "ng" : ""}"><i data-w="${Math.min(100, g.v / g.max * 100)}" data-nk="g-${c.id}-${j}"></i><s style="left:${g.th / g.max * 100}%"></s></div></div>`).join("")}</div>
       <div class="ck-text">${esc(c.rule)}</div>
       <div class="ck-text">${esc(c.target)}</div>
       <span class="ck-go">근거 전표 보기${ICON.arrow}</span>
